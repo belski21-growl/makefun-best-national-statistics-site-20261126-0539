@@ -156,6 +156,7 @@ export const RELEASES = [
 
 export const SOURCES = [
   { name: 'Badan Pusat Statistik (BPS)', url: 'https://www.bps.go.id', what: 'Sensus Penduduk 2020, proyeksi penduduk, PDB, IHK, Sakernas, Susenas, IPM.' },
+  { name: 'Bank Dunia (World Bank)', url: 'https://data.worldbank.org', what: 'World Development Indicators 2024: PDB per kapita, penduduk, harapan hidup, inflasi, pertumbuhan PDB, pengangguran, kemiskinan — dipakai untuk semua perbandingan Indonesia vs dunia dan negara sebanding.' },
   { name: 'Bank Indonesia', url: 'https://www.bi.go.id', what: 'Data moneter dan sistem pembayaran (rujukan silang inflasi).' },
   { name: 'Kementerian Keuangan', url: 'https://www.kemenkeu.go.id', what: 'APBN dan asumsi makro (rujukan silang PDB).' },
 ];

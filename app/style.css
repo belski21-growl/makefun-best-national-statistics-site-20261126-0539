@@ -193,3 +193,66 @@ summary { cursor: pointer; font-weight: 700; color: var(--teal-dark); }
   .facts dd { margin-bottom: 8px; }
   .data-table { display: block; overflow-x: auto; }
 }
+
+/* Revisi: perbandingan dunia, peta provinsi, penjelasan grafik. */
+.world-line {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--teal);
+  margin: 2px 0 4px;
+}
+.chart-note {
+  font-size: 0.92rem;
+  color: #33413f;
+  background: #f0ebe0;
+  border-left: 4px solid var(--teal);
+  padding: 8px 12px;
+  margin: 10px 0;
+}
+.insight p { max-width: 68ch; }
+.table-scroll { overflow-x: auto; }
+.peer-table td:first-child { font-weight: 600; }
+.peer-table td:nth-child(2) { background: var(--amber-soft); }
+
+.map-wrap { margin: 6px 0 4px; }
+.prov-map { width: 100%; height: auto; display: block; }
+.prov-map .island { fill: #eef4f2; stroke: none; }
+.prov-map .island-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  fill: #9db8b2;
+  font-family: system-ui, sans-serif;
+}
+.prov-map .prov-label {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: system-ui, sans-serif;
+  pointer-events: none;
+}
+.prov-map .prov-link { cursor: pointer; }
+.prov-map .prov-link:hover polygon { stroke: var(--amber); stroke-width: 3; }
+.prov-map .prov-link:focus { outline: none; }
+.prov-map .prov-link:focus polygon { stroke: var(--amber); stroke-width: 3; }
+.map-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 0;
+  margin: 8px 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.map-legend .swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+@media (max-width: 760px) {
+  .prov-map .prov-label { font-size: 11px; }
+  .prov-map .island-label { font-size: 12px; }
+}
