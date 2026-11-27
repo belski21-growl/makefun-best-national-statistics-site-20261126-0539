@@ -8,13 +8,15 @@
 
 ## NusaStat
 
-NusaStat is a national statistics site for Indonesia. The front page is a living dashboard: a year slider from 2019 to 2025 re-bases the whole page, 8 KPI cards show the headline numbers, and a map of all 38 provinces opens a page per province. A compare page puts provinces side by side, and every number comes from real BPS 2024 data. The site runs fully offline, with no network calls at all.
+NusaStat is a national statistics site for Indonesia. The front page is a living dashboard: a year slider from 2019 to 2025 re-bases the whole page, 8 KPI cards show the headline numbers with visible trend sparklines, and a macro trajectory chart shows GDP growth versus inflation with a range toggle. A clickable map of all 38 provinces opens a panel with that province's population, land area, density and population rank. A top-6 province ranking panel sits beside the map with a Penduduk/Kepadatan toggle. A compare page puts countries side by side, and every number comes from real BPS and World Bank data. The site runs fully offline, with no network calls at all.
 
 ## How to run
 
 Serve the app/ folder with any static server, for example:
 
+```bash
 python3 -m http.server
+```
 
 Then open index.html in a browser.
 

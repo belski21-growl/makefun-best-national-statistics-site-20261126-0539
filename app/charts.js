@@ -45,10 +45,14 @@ function polyline(points) {
 // ------------------------------------------------------------------ sparkline
 
 // A 7 point trend for a KPI card. No axis, no labels: it is a shape, the number
-// beside it carries the meaning.
+// beside it carries the meaning. Size and stroke are options because the cover
+// needs a line that survives a screenshot: a hairline at 1.8 px reads as dirt,
+// a 2.6 px line at 104 by 30 reads as a trend.
 export function sparkline(values, options = {}) {
-  const w = options.w || 96;
-  const h = options.h || 26;
+  const w = options.w || 104;
+  const h = options.h || 30;
+  const stroke = options.stroke || 2.6;
+  const colour = options.color || 'var(--green-800)';
   const clean = values.filter((v) => v !== null && v !== undefined);
   if (clean.length < 2) return '';
   const e = extent(clean);
@@ -63,12 +67,97 @@ export function sparkline(values, options = {}) {
   return (
     '<svg class="spark" viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" aria-hidden="true" focusable="false">' +
     '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0%" stop-color="var(--accent)" stop-opacity="0.28"/>' +
-    '<stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>' +
+    '<stop offset="0%" stop-color="' + colour + '" stop-opacity="0.22"/>' +
+    '<stop offset="100%" stop-color="' + colour + '" stop-opacity="0"/>' +
     '</linearGradient></defs>' +
     '<path d="' + polyline(points) + ' L ' + px(last.x) + ' ' + h + ' L ' + px(points[0].x) + ' ' + h + ' Z" fill="url(#' + id + ')"/>' +
-    '<path d="' + polyline(points) + '" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>' +
-    '<circle cx="' + px(last.x) + '" cy="' + px(last.y) + '" r="2.6" fill="var(--accent)"/>' +
+    '<path d="' + polyline(points) + '" fill="none" stroke="' + colour + '" stroke-width="' + stroke + '" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + px(last.x) + '" cy="' + px(last.y) + '" r="' + (stroke + 0.9) + '" fill="' + colour + '"/>' +
+    '</svg>'
+  );
+}
+
+// ------------------------------------------------------------------ dual line
+
+// Two series on one percentage axis, for the macro card: GDP growth and
+// inflation share a unit, so one axis is honest. The focused year gets a
+// vertical band and both of its points are labelled, which is the whole point
+// of the card: read the two numbers of one year and the gap between them.
+export function dualLine(chart) {
+  const { years, series, width = 640, height = 226 } = chart;
+  const decimals = chart.decimals === undefined ? 2 : chart.decimals;
+  const highlight = chart.highlight;
+  const hasHi = highlight !== undefined && highlight !== null && years.includes(Number(highlight));
+
+  const padLeft = 36;
+  const padRight = 20;
+  const padTop = 22;
+  const padBottom = 26;
+  const plotW = width - padLeft - padRight;
+  const plotH = height - padTop - padBottom;
+
+  const all = series.flatMap((s) => s.values).filter((v) => v !== null && v !== undefined);
+  const e = extent(all);
+  const span = e.max - e.min || 1;
+  const min = e.min - span * 0.22;
+  const max = e.max + span * 0.22;
+  const ticks = niceTicks(min, max, 4);
+
+  const xOf = (i) => padLeft + (plotW / Math.max(1, years.length - 1)) * i;
+  const yOf = (v) => padTop + plotH - ((v - min) / (max - min)) * plotH;
+
+  const grid = ticks
+    .map(
+      (t) =>
+        '<line x1="' + padLeft + '" y1="' + px(yOf(t)) + '" x2="' + (padLeft + plotW) + '" y2="' + px(yOf(t)) + '" class="grid' + (t === 0 ? ' zero' : '') + '"/>' +
+        '<text x="' + (padLeft - 7) + '" y="' + px(yOf(t) + 3.5) + '" class="axis" text-anchor="end">' + num(t, ticks.length > 5 ? 0 : 1) + '</text>',
+    )
+    .join('');
+
+  const hiIndex = hasHi ? years.indexOf(Number(highlight)) : -1;
+  const band = hiIndex < 0
+    ? ''
+    : '<rect class="focus-band" x="' + px(xOf(hiIndex) - 13) + '" y="' + padTop + '" width="26" height="' + plotH + '" rx="3"/>';
+
+  const paths = series
+    .map((s) => {
+      const points = s.values
+        .map((v, i) => ({ v, i }))
+        .filter((p) => p.v !== null && p.v !== undefined)
+        .map((p) => ({ x: xOf(p.i), y: yOf(p.v), v: p.v, i: p.i }));
+      const dots = points
+        .map((p) => {
+          const isHi = p.i === hiIndex;
+          return '<circle class="dual-dot' + (isHi ? ' is-hi' : '') + ' ' + (s.className || '') + '" cx="' + px(p.x) + '" cy="' + px(p.y) + '" r="' + (isHi ? 4.2 : 2.8) + '"/>';
+        })
+        .join('');
+      return (
+        '<path class="dual-path ' + (s.className || '') + '" d="' + polyline(points) + '" fill="none" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>' +
+        dots
+      );
+    })
+    .join('');
+
+  // Endpoint labels for both series plus the focused year's pair, placed on the
+  // side that has room so the two lines never overprint each other.
+  const labels = series
+    .map((s) => {
+      const lastIndex = s.values.length - 1;
+      const v = s.values[lastIndex];
+      if (v === null || v === undefined) return '';
+      const above = lastIndex === hiIndex || yOf(v) > padTop + plotH * 0.5;
+      const y = yOf(v) + (above ? -11 : 16);
+      return '<text class="dual-label ' + (s.className || '') + '" x="' + px(xOf(lastIndex)) + '" y="' + px(y) + '" text-anchor="end">' + num(v, decimals) + '</text>';
+    })
+    .join('');
+
+  const xLabels = years
+    .map((y, i) => '<text x="' + px(xOf(i)) + '" y="' + (height - 8) + '" class="axis' + (i === hiIndex ? ' is-hi' : '') + '" text-anchor="middle">' + y + '</text>')
+    .join('');
+
+  return (
+    '<svg class="chart chart-dual" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + escapeHTML(chart.label || '') + '" preserveAspectRatio="none">' +
+    grid + band + paths + labels + xLabels +
     '</svg>'
   );
 }

@@ -14,7 +14,7 @@ import {
   EDUCATION, HEALTH, TRADE, AGE_GROUPS, SECTORS, PRICE_GROUPS,
   RELEASES, SOURCES, SECTIONS, SEARCH_INDEX, GINI, searchIndicators,
 } from './data.js';
-import { sparkline, columns, line, horizontalBars, groupedColumns, shareBar, provinceRanks, escapeHTML as esc } from './charts.js';
+import { sparkline, dualLine, columns, line, horizontalBars, groupedColumns, shareBar, provinceRanks, escapeHTML as esc } from './charts.js';
 import { provinceMapSVG, mapLegend } from './map.js';
 
 // ------------------------------------------------------------------ small helpers
@@ -77,9 +77,13 @@ function nullNote(key) {
 }
 
 // Every KPI card: value, label, context, one Dunia line with a delta chip,
-// source plus year, and a link to its section.
+// source plus year, and a link to its section. The sparkline sits on its own
+// row under the value: at four columns a 150 px card cannot hold a 100 px chart
+// beside a 20 px numeral without one of them overflowing, and r3 proved it.
 function kpiCard(card) {
-  const spark = card.spark && card.spark.length > 2 ? sparkline(card.spark, { w: 92, h: 26 }) : '';
+  const spark = card.spark && card.spark.length > 2
+    ? sparkline(card.spark, { w: 104, h: 24, stroke: 2.4, color: card.key === 'pertumbuhan' ? 'var(--accent)' : 'var(--green-700)' })
+    : '';
   const worldLine = card.chip && (card.chip.includes('persen') || card.chip.includes('poin') || card.chip.includes('setara'))
     ? '<span class="chip ' + card.tone + '">' + esc(card.chip) + '</span>'
     : '';
@@ -87,12 +91,102 @@ function kpiCard(card) {
     '<article class="kpi' + (card.key === 'pertumbuhan' ? ' is-accent' : '') + '" data-kpi="' + card.key + '">' +
     '<div class="kpi-top"><span class="kpi-value">' + card.value +
     (card.unit ? '<span class="kpi-unit">' + esc(card.unit) + '</span>' : '') +
-    '</span>' + spark + '</div>' +
+    '</span></div>' +
+    (spark ? '<div class="kpi-spark">' + spark + '</div>' : '') +
     '<div class="kpi-label">' + esc(card.label) + (card.month && !card.label.includes(card.month) ? ' <span class="chip flat">' + esc(card.month) + '</span>' : '') + '</div>' +
     '<div class="kpi-ctx">' + esc(card.context) + '</div>' +
     '<div class="kpi-world">' + esc(card.world) + (worldLine ? ' ' + worldLine : '') + '</div>' +
     '<div class="kpi-foot"><span>' + esc(card.yearLabel) + '</span><a href="' + card.href + '">Bagian</a></div>' +
     '</article>'
+  );
+}
+
+// ------------------------------------------------------------------ macro card
+
+// The cover chart. Two series, one percentage axis, the focused year banded and
+// both endpoint values labelled. The range toggle is held in ?rentang= so a
+// copied link reproduces the exact view, the same rule the slider follows.
+function macroCard(state) {
+  const short = state.params && state.params.get('rentang') === 'pendek';
+  const from = short ? 2021 : 2019;
+  const slice = YEARS.map((y, i) => (y >= from ? i : -1)).filter((i) => i >= 0);
+  const years = slice.map((i) => YEARS[i]);
+  const growth = slice.map((i) => SERIES.pertumbuhan.values[i]);
+  const inflasi = slice.map((i) => SERIES.inflasi.values[i]);
+
+  const chart = dualLine({
+    years,
+    highlight: state.year >= from ? state.year : null,
+    series: [
+      { values: growth, className: 'is-growth' },
+      { values: inflasi, className: 'is-cpi' },
+    ],
+    width: 640,
+    height: 214,
+    label: 'Pertumbuhan PDB dan inflasi Indonesia, ' + from + ' sampai 2025, persen',
+  });
+
+  const g = seriesValue('pertumbuhan', state.year);
+  const c = seriesValue('inflasi', state.year);
+  const gap = g === null || c === null ? null : g - c;
+  const over = YEARS.filter((y) => {
+    const gy = seriesValue('pertumbuhan', y);
+    const cy = seriesValue('inflasi', y);
+    return gy !== null && cy !== null && cy > gy;
+  });
+
+  return (
+    '<div class="card macro-card">' +
+    '<div class="macro-head">' +
+    '<div><h3>Lintasan makro: ekonomi tumbuh di atas inflasi, ' + from + ' sampai 2025</h3>' +
+    '<p class="card-sub">Dua garis, satu sumbu persen. Pertumbuhan riil melampaui inflasi di hampir setiap tahun. Tahun fokus ' + state.year + ' disorot. Sumber BPS.</p></div>' +
+    '<div class="range-toggle" role="group" aria-label="Rentang tahun grafik">' +
+    '<button type="button" data-range="panjang" aria-pressed="' + (short ? 'false' : 'true') + '">2019-2025</button>' +
+    '<button type="button" data-range="pendek" aria-pressed="' + (short ? 'true' : 'false') + '">2021-2025</button>' +
+    '</div>' +
+    '</div>' +
+    '<div class="macro-legend"><span class="lg lg-growth">Pertumbuhan PDB</span><span class="lg lg-cpi">Inflasi</span></div>' +
+    chart +
+    interpretation(
+      gap === null
+        ? 'Angka tahun ini belum lengkap.'
+        : 'Pada ' + state.year + ' pertumbuhan ' + num(g, 2) + ' persen dan inflasi ' + num(c, 2) +
+          ' persen, jadi pertumbuhan riil ' + (gap >= 0 ? 'di atas' : 'di bawah') + ' inflasi dengan selisih ' +
+          num(Math.abs(gap), 2) + ' poin. Dari tujuh tahun, inflasi hanya melampaui pertumbuhan pada ' +
+          (over.length === 0 ? 'tidak ada tahun' : over.join(' dan ')) + '.',
+    ) +
+    '</div>'
+  );
+}
+
+// ------------------------------------------------------------------ province ranks
+
+// Top six provinces beside the map. Same population table the map and the
+// province page read, only sorted: no second source, no new figure.
+function rankPanel(state) {
+  const byDensity = state.params && state.params.get('urut') === 'padat';
+  const rows = [...PROVINCES]
+    .sort((a, b) => (byDensity ? b.density - a.density : b.population - a.population))
+    .slice(0, 6)
+    .map((p) => ({ name: p.name, value: byDensity ? p.density : p.population }));
+
+  const bars = provinceRanks(rows, {
+    label: byDensity ? 'Enam provinsi terpadat' : 'Enam provinsi terbesar menurut penduduk',
+    decimals: byDensity ? 0 : 1,
+    width: 420,
+  });
+
+  return (
+    '<div class="rank-panel">' +
+    '<div class="rank-head"><h3>Provinsi terbesar: Jawa Barat pimpin jumlah warga' + (byDensity ? ', Jakarta terpadat' : '') + '</h3>' +
+    '<span class="aside">' + (byDensity ? 'jiwa per km2' : 'juta jiwa') + ', data ' + PROVINCE_YEAR + '</span></div>' +
+    '<div class="rank-toggle" role="group" aria-label="Ukuran peringkat provinsi">' +
+    '<button type="button" data-rank="pop" aria-pressed="' + (byDensity ? 'false' : 'true') + '">Penduduk</button>' +
+    '<button type="button" data-rank="padat" aria-pressed="' + (byDensity ? 'true' : 'false') + '">Kepadatan</button>' +
+    '</div>' +
+    bars +
+    '<p class="rank-note">Enam dari 38 provinsi, ' + (byDensity ? 'kepadatan dihitung dari penduduk dan luas' : 'penduduk ' + PROVINCE_YEAR + ', BPS') + '. <a href="' + href(state, '/provinsi') + '">Semua provinsi</a></p>' +
+    '</div>'
   );
 }
 
@@ -237,7 +331,7 @@ export function renderHome(state) {
       crumbs: 'Beranda',
       className: 'is-cover',
       title: 'Satu gestur, seluruh angka Indonesia',
-      dek: 'Geser tahun 2019 sampai 2025 dan delapan angka utama berubah. Klik satu dari 38 provinsi dan panelnya terbuka di tempat.',
+      dek: 'Geser tahun, klik provinsi: delapan angka utama dan grafik makro ikut berubah.',
       stamp: UPDATED,
     }) +
 
@@ -247,18 +341,22 @@ export function renderHome(state) {
     '<div class="kpi-grid" id="kpi-grid" aria-live="polite" aria-label="Delapan angka utama tahun ' + state.year + '">' +
     cards.map(kpiCard).join('') +
     '</div>' +
+    macroCard(state) +
     '<div class="summary-strip" id="summary-strip">' +
     '<span class="strip-tag">Ringkasan ' + state.year + '</span>' +
     '<span class="strip-text">' + esc(summary) + '</span>' +
     '</div>' +
     '</div>' +
-    '<div class="dash-right">' + mapPanel(state, { aside: 'Peta 38 provinsi, data ' + PROVINCE_YEAR }) + '</div>' +
+    '<div class="dash-right">' +
+    mapPanel(state, { aside: 'Peta 38 provinsi, data ' + PROVINCE_YEAR }) +
+    rankPanel(state) +
+    '</div>' +
     '</div>' +
 
     '<div class="chart-pair">' +
     '<div class="card">' +
-    '<h3>Pertumbuhan PDB, 2019 sampai 2025</h3>' +
-    '<p class="card-sub">Persen, tahunan. Batang ' + state.year + ' disorot. Sumber BPS.</p>' +
+    '<h3>Ekonomi pulih dan bertahan di kisaran lima persen, 2019 sampai 2025</h3>' +
+    '<p class="card-sub">Persen, tahunan. Hanya 2020 menyusut akibat pandemi; tahun ' + state.year + ' disorot. Sumber BPS.</p>' +
     growthChart +
     interpretation(
       growthNow === null
@@ -269,8 +367,8 @@ export function renderHome(state) {
     ) +
     '</div>' +
     '<div class="card">' +
-    '<h3>Penduduk, 2019 sampai 2025</h3>' +
-    '<p class="card-sub">Juta jiwa, pertengahan tahun. Titik ' + state.year + ' disorot. Sumber BPS.</p>' +
+    '<h3>Penduduk bertambah hampir 18 juta jiwa dalam enam tahun, 2019 sampai 2025</h3>' +
+    '<p class="card-sub">Juta jiwa, pertengahan tahun. Laju pertambahan stabil; titik ' + state.year + ' disorot. Sumber BPS.</p>' +
     popChart +
     interpretation(
       'Penduduk bertambah ' + num(popSeries[popSeries.length - 1] - popSeries[0], 1) + ' juta jiwa dalam enam tahun, dari ' +
@@ -1084,6 +1182,25 @@ export function bindChrome(state) {
       const query = params.toString();
       location.hash = '#/banding' + (query ? '?' + query : '');
     });
+  });
+
+  // Chart range on the cover macro card, and the rank panel's measure. Both
+  // live in the URL beside the year so a copied link reproduces the view.
+  const setParam = (key, value, fallback) => {
+    const params = new URLSearchParams(location.hash.split('?')[1] || '');
+    if (value === fallback) params.delete(key);
+    else params.set(key, value);
+    const query = params.toString();
+    const base = state.path === '/' ? '#/' : '#' + state.path;
+    location.hash = base + (query ? '?' + query : '');
+  };
+
+  document.querySelectorAll('.range-toggle [data-range]').forEach((button) => {
+    button.addEventListener('click', () => setParam('rentang', button.getAttribute('data-range'), 'panjang'));
+  });
+
+  document.querySelectorAll('.rank-toggle [data-rank]').forEach((button) => {
+    button.addEventListener('click', () => setParam('urut', button.getAttribute('data-rank'), 'pop'));
   });
 
   // Province clicks: the map's own links point at #/provinsi?pilih=, which would
