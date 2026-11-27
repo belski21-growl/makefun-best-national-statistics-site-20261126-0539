@@ -11,8 +11,13 @@
 // Warna: lima tingkat menurut penduduk 2024 (data.js) — makin gelap makin
 // banyak penduduk. Klik provinsi membuka detailnya (tautan hash yang sama
 // dengan yang dipakai tabel provinsi).
+//
+// REVISI RONDE 2: toggle metrik — peta juga bisa diwarnai menurut kepadatan
+// penduduk (jiwa/km²), bukan hanya jumlah penduduk. Tingkat kepadatan:
+// Jakarta (~16.000/km²) jauh di atas provinsi lain, jadi tingkat teratas
+// dipisah (>= 10.000) supaya peta tidak jadi satu warna.
 
-import { PROVINCES } from './data.js';
+import { PROVINCES, density } from './data.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -76,13 +81,32 @@ const TIERS = [
   { min: 0, fill: '#d7ece8', text: '#1c2b2a' },
 ];
 
+// Tingkat kepadatan (jiwa/km²): Jakarta ~16.061, DIY ~1.226, Jabar ~1.421,
+// Banten ~1.278, Jateng ~1.156, Jatim ~874, Bali ~759 — tingkat teratas
+// dipisah di 10.000 supaya Jakarta tidak menenggelamkan skala Jawa.
+const DENSITY_TIERS = [
+  { min: 10000, fill: '#0b3d3a', text: '#ffffff' },
+  { min: 1000, fill: '#0f766e', text: '#ffffff' },
+  { min: 500, fill: '#2a9d8f', text: '#ffffff' },
+  { min: 100, fill: '#8ecdc2', text: '#1c2b2a' },
+  { min: 0, fill: '#d7ece8', text: '#1c2b2a' },
+];
+
+const POP_LABELS = ['25 jt ke atas', '10–25 jt', '5–10 jt', '2–5 jt', 'di bawah 2 jt'];
+const DENSITY_LABELS = ['10.000/km² ke atas', '1.000–10.000/km²', '500–1.000/km²', '100–500/km²', 'di bawah 100/km²'];
+
 function tierFor(pop) {
   return TIERS.find((t) => pop >= t.min) || TIERS[TIERS.length - 1];
 }
 
-export function provinceMapSVG(selectedName) {
+function densityTierFor(d) {
+  return DENSITY_TIERS.find((t) => d >= t.min) || DENSITY_TIERS[DENSITY_TIERS.length - 1];
+}
+
+export function provinceMapSVG(selectedName, metric = 'pop') {
   const byName = new Map(PROVINCES.map((p) => [p.name, p]));
-  let s = `<svg viewBox="0 0 1000 470" role="img" aria-label="Peta skematik 38 provinsi Indonesia, diwarnai menurut jumlah penduduk" class="prov-map">`;
+  const metricLabel = metric === 'density' ? 'kepadatan penduduk' : 'jumlah penduduk';
+  let s = `<svg viewBox="0 0 1000 470" role="img" aria-label="Peta skematik 38 provinsi Indonesia, diwarnai menurut ${metricLabel}" class="prov-map">`;
   for (const is of ISLANDS) {
     s += `<polygon points="${is.points}" class="island"/><text x="${is.x}" y="${is.y}" class="island-label" text-anchor="middle">${is.label}</text>`;
   }
@@ -91,18 +115,20 @@ export function provinceMapSVG(selectedName) {
   for (const [name, points, lx, ly, short] of SHAPES) {
     const p = byName.get(name);
     if (!p) continue;
-    const t = tierFor(p.pop);
+    const t = metric === 'density' ? densityTierFor(density(p)) : tierFor(p.pop);
     const sel = name === selectedName;
     const href = `#/provinsi?pilih=${encodeURIComponent(name)}`;
-    s += `<a href="${href}" class="prov-link${sel ? ' selected' : ''}"><polygon points="${points}" fill="${t.fill}"${sel ? ' stroke="#b45309" stroke-width="4"' : ' stroke="#faf7f0" stroke-width="2"'}><title>${esc(name)} — sekitar ${esc(String(p.pop).replace('.', ','))} juta jiwa (2024)</title></polygon><text x="${lx}" y="${ly}" class="prov-label" fill="${t.text}" text-anchor="middle">${esc(short || name)}</text></a>`;
+    const title = metric === 'density'
+      ? `${name} — kepadatan sekitar ${density(p).toLocaleString('id-ID')} jiwa/km² (2024)`
+      : `${name} — sekitar ${esc(String(p.pop).replace('.', ','))} juta jiwa (2024)`;
+    s += `<a href="${href}" class="prov-link${sel ? ' selected' : ''}" aria-label="${esc(title)}"><polygon points="${points}" fill="${t.fill}"${sel ? ' stroke="#b45309" stroke-width="4"' : ' stroke="#faf7f0" stroke-width="2"'}><title>${esc(title)}</title></polygon><text x="${lx}" y="${ly}" class="prov-label" fill="${t.text}" text-anchor="middle">${esc(short || name)}</text></a>`;
   }
   s += '</svg>';
   return s;
 }
 
-export function mapLegend() {
-  return `<ul class="map-legend" aria-label="Legenda warna peta">${TIERS.map((t, i) => {
-    const label = i === 0 ? '25 jt ke atas' : i === 1 ? '10–25 jt' : i === 2 ? '5–10 jt' : i === 3 ? '2–5 jt' : 'di bawah 2 jt';
-    return `<li><span class="swatch" style="background:${t.fill}"></span>${label}</li>`;
-  }).join('')}</ul>`;
+export function mapLegend(metric = 'pop') {
+  const tiers = metric === 'density' ? DENSITY_TIERS : TIERS;
+  const labels = metric === 'density' ? DENSITY_LABELS : POP_LABELS;
+  return `<ul class="map-legend" aria-label="Legenda warna peta">${tiers.map((t, i) => `<li><span class="swatch" style="background:${t.fill}"></span>${labels[i]}</li>`).join('')}</ul>`;
 }

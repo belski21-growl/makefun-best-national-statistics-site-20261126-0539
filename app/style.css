@@ -68,18 +68,18 @@ a:hover { color: var(--amber); }
 .mainnav a:hover { background: #e6efec; color: var(--teal-dark); }
 .mainnav a[aria-current="page"] { background: var(--teal-dark); color: #fff; }
 
-.hero { padding: 26px 0 8px; }
+.hero { padding: 18px 0 4px; }
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--amber);
-  margin: 0 0 8px;
+  margin: 0 0 6px;
 }
-.hero h1 { font-size: 2.6rem; margin: 0 0 12px; }
+.hero h1 { font-size: 2.6rem; margin: 0 0 10px; }
 .lede { font-size: 1.15rem; color: #33413f; max-width: 62ch; }
-.hero-cta { margin: 20px 0 8px; display: flex; flex-wrap: wrap; gap: 10px; }
+.hero-cta { margin: 16px 0 6px; display: flex; flex-wrap: wrap; gap: 10px; }
 .hero-meta { color: var(--muted); font-size: 0.9rem; }
 
 .btn {
@@ -255,4 +255,90 @@ summary { cursor: pointer; font-weight: 700; color: var(--teal-dark); }
 @media (max-width: 760px) {
   .prov-map .prov-label { font-size: 11px; }
   .prov-map .island-label { font-size: 12px; }
+}
+
+/* Revisi ronde 2: konteks KPI, chip delta vs Dunia, cari indikator,
+   pemilih tahun, strip ringkasan, kalimat interpretasi, halaman banding. */
+.kpi-context {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 2px 0 4px;
+}
+.delta-chip {
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--amber);
+  background: var(--amber-soft);
+  border: 1px solid #f2d3a4;
+  border-radius: 999px;
+  padding: 2px 10px;
+  margin: 2px 0 6px;
+}
+.kpi-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.kpi-link:hover { text-decoration: underline; }
+.interp {
+  font-size: 0.98rem;
+  color: #33413f;
+  font-style: italic;
+  margin: 2px 0 10px;
+  max-width: 68ch;
+}
+.summary-strip {
+  background: var(--teal-dark);
+  color: #eef6f4;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 0.98rem;
+  margin: 12px 0 4px;
+}
+.summary-strip strong { color: #f2b25c; }
+.home-tools { margin-top: 18px; }
+.search-results {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  border-top: 1px solid var(--line);
+}
+.search-results li { padding: 8px 2px; border-bottom: 1px solid var(--line); }
+.search-results li a { text-decoration: none; font-weight: 600; }
+.search-results li a:hover { text-decoration: underline; }
+.home-charts h2 { margin-top: 0.7em; }
+.peer-table th.hl-col, .peer-table td.hl-col { background: var(--amber-soft); }
+/* Revisi ronde 2 — kompresi viewport pertama beranda: KPI 2025 + 2 grafik
+   harus terlihat tanpa scroll di 1280×800 (pola 9 dari 10 entry terkuat).
+   Biaya terbesar adalah line-height 1.6 bawaan body — kartu KPI memakai 1.3. */
+.site-header { padding: 4px 0; }
+.brand { font-size: 1.35rem; }
+.tagline { font-size: 0.8rem; }
+.mainnav { margin: 8px 0 2px; padding-bottom: 6px; }
+.mainnav a { padding: 2px 9px; font-size: 0.88rem; }
+.hero { padding: 6px 0 2px; }
+.hero h1 { font-size: 1.55rem; margin: 0 0 6px; }
+.hero-meta { margin: 6px 0 0; }
+.home-tools { margin: 8px 0; padding: 2px 18px 8px; }
+.home-tools .controls { margin: 6px 0; }
+.summary-strip { padding: 7px 14px; font-size: 0.88rem; margin: 6px 0 4px; }
+.kpi-grid { margin: 10px 0; gap: 10px; }
+.kpi { padding: 5px 12px 5px; line-height: 1.3; }
+.kpi-value { font-size: 1.35rem; }
+.kpi-label { font-size: 0.85rem; min-height: 2.2em; }
+.kpi-context { font-size: 0.85rem; margin: 1px 0 3px; }
+.world-line { font-size: 0.8rem; margin: 1px 0 3px; }
+.delta-chip { font-size: 0.75rem; padding: 1px 8px; margin: 0 0 0 2px; }
+.kpi-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 4px; }
+.kpi-src { margin-top: 0; }
+.kpi-link { margin-top: 0; font-size: 0.84rem; white-space: nowrap; }
+.home-charts h2 { margin-top: 0.4em; }
+@media (max-width: 760px) {
+  .kpi-grid { gap: 10px; }
+  .kpi-value { font-size: 1.45rem; }
+  .summary-strip { font-size: 0.92rem; }
 }
