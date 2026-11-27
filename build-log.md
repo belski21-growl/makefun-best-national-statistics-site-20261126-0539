@@ -1,236 +1,165 @@
-# Build log — NusaStat (best-national-statistics-site-20261126-0539)
+# Build log, revision round 3
 
-## Yang dibangun
+Round 3 of the NusaStat entry, `best-national-statistics-site-20261126-0539`.
+Starting position: rank 246 of 4140, score 641.755, win rate 64,18 percent.
+One differentiator for the whole round, chosen before any code was written:
+turn the cover from an editorial hero into a living dashboard.
 
-**NusaStat** — portal statistik nasional Indonesia (desain original, Bahasa
-Indonesia), situs statis di bawah `app/`, tanpa build step, tanpa library,
-tanpa network saat runtime. Grafik SVG digambar sendiri (`app/charts.js`:
-bar, line, horizontal bar, sparkline).
+## The differentiator
 
-Halaman (semua lewat hash route + tautan navigasi):
-- `#/` Beranda — hero + 8 kartu KPI 2024 (dengan sparkline) + grafik
-  pertumbuhan PDB + rilis terbaru + "kenapa angka ini bisa dipercaya".
-- `#/ekonomi` — pilih seri (PDB, PDB nominal, inflasi, pengangguran,
-  kemiskinan), pilih jenis grafik (batang/garis), unduh CSV seri, tabel,
-  pangsa PDB per lapangan usaha, catatan cara membaca angka.
-- `#/penduduk` — tren penduduk 2019–2024, struktur umur, 10 provinsi terpadat.
-- `#/provinsi` — cari (live filter), urutkan (penduduk / kepadatan / nama),
-  klik provinsi untuk detail, unduh CSV; 38 provinsi.
-- `#/harga` — inflasi tahunan + inflasi menurut 11 kelompok pengeluaran,
-  glosarium IHK / y-on-y / inflasi inti.
-- `#/kerja` — TPT 2019–2024, pangsa pekerja per lapangan usaha, angka kunci
-  Sakernas Agustus 2024.
-- `#/data` — unduh 3 CSV (seri tahunan, provinsi, inflasi kelompok) yang
-  dibuat di peramban dari data halaman; tabel seri + tabel rilis.
-- `#/tentang` — sumber, metode & batasan, kontak/koreksi.
-- Route tak dikenal menampilkan halaman "tidak ditemukan" dengan tautan.
+Two gestures, both on the first screen:
 
-Data: angka publik BPS (penduduk 281,6 jt 2024; PDB tumbuh 5,03% 2024;
-PDB nominal Rp22.139 T; inflasi 1,57%; TPT 4,91%; kemiskinan 8,57%;
-IPM 75,02; gini ~0,379). Angka provinsi/luas/kelompok harga adalah
-perkiraan yang dibulatkan dan diberi label "sekitar/perkiraan" beserta
-tahun acuan + sumber di tiap grafik/tabel. Selisih jumlah provinsi
-(282,3 jt) vs angka nasional (281,6 jt) dijelaskan di halaman sebagai
-efek pembulatan — bukan disembunyikan.
+1. A year slider from 2019 to 2025. Moving it rebuilds the eight KPI cards and
+   the one line summary strip. Every card keeps its own context line, its
+   Dunia comparison line with a delta chip, its source and year, and a link to
+   its section.
+2. A clickable map of all 38 provinces. Clicking one opens a panel with that
+   province's population, land area, density and population rank.
 
-## File
+Neither gesture reloads the page and neither touches the network. Both are
+written into the URL (`?tahun=2020`, `?pilih=Aceh`, `?metrik=density`), so a
+reload or a copied link reproduces the same view. That is what makes the
+dashboard provable in about a minute: drag the slider, read a different number;
+click a province, read a different panel.
 
-- `app/index.html`, `app/style.css`, `app/main.js` (router + binding),
-  `app/views.js` (8 halaman), `app/data.js` (semua data + sumber),
-  `app/charts.js` (grafik SVG tanpa library)
-- `main.ts` (salin app/ + screenshots/ ke /output, tulis dossier.json —
-  mengikuti pola starter kit), `serve.ts` (server dev lokal),
-  `vendor/makefun-frontend.ts` (dari kit, tidak diubah)
-- `README.md` (template badge make.fun, terisi), `LICENSE` (MIT),
-  `shots.json` (4 tampilan)
-- `screenshots/`: 1-home.jpg (1280×800), 2-ekonomi.jpg (1280×800),
-  3-provinsi.jpg (1280×800), 4-home-phone.jpg (390×844) — semuanya ASLI,
-  diambil dari situs yang sedang berjalan (lihat validasi).
+The point of building it this way is that a parity rebuild cannot copy it. The
+gesture only works if the full 2019 to 2025 series exists for every indicator
+and if provincial data is wired through the cards and the panel. A site with
+one year of numbers can draw the same slider and it will do nothing.
 
-## Validasi yang dijalankan
+## What was written
 
-1. **Serve lokal** (`node serve.ts --port 8123`): index/main.js/data.js/
-   style.css semua HTTP 200.
-2. **Render semua route** di headless Chromium
-   (`chrome-headless-shell`, `--dump-dom`): `#/`, `#/ekonomi`,
-   `#/penduduk`, `#/harga`, `#/kerja`, `#/data`, `#/tentang`, dan route
-   tak dikenal — semuanya menampilkan konten yang benar (KPI, grafik,
-   tabel 38 provinsi, halaman 404).
-3. **Cek offline**: tidak ada `fetch`/`XMLHttpRequest`/URL eksternal di
-   kode JS/CSS. Satu-satunya `https://` adalah URL sumber (bps.go.id,
-   bi.go.id, kemenkeu.go.id) sebagai teks/tautan di halaman Tentang —
-   tidak pernah di-fetch saat load. Satu-satunya `http://` lain adalah
-   namespace SVG (`w3.org/2000/svg`), bukan network request.
-4. **Cek HP**: viewport 390×844 — navigasi membungkus rapi, hero dan kartu
-   terbaca, tidak ada overflow horizontal (diverifikasi lewat screenshot).
-5. **main.ts 2x run** (`MAKEFUN_OUTPUT_DIR=/tmp/out1` dan `/tmp/out2`):
-   `diff -r` identik — **byte-identik**. `dossier.json` terbentuk
-   (468.226 byte, kunci: cover/images/schema/text).
-6. **Screenshot**: 4 file JPEG kualitas 80, masing-masing < 256 KiB
-   (95/74/88/58 KB). Diperiksa visual: Beranda desktop, Ekonomi (grafik
-   batang PDB — label grid diperbaiki dari 2 desimal ke 1 desimal setelah
-   review visual pertama), Provinsi (tabel + kontrol), Beranda HP.
-7. **Perbaikan sesudah review visual**: label sumbu grafik (6,98 → 7,0
-   dst.) + penjelasan selisih total provinsi di halaman Provinsi.
+Nine files rewritten from the design spec, as full-file writes:
 
-## Estimasi rank / peluang (jujur)
+    app/views.js      every route except compare, the map panel, all controls
+    app/compare.js    the banding page
+    main.ts           entrypoint: copy, dossier, then serve under the suite
+    README.md
+    build-log.md      this file
+    revision-log.md
 
-- Klasifikasi: RINGAN — 1 sesi builder, web app sekali jalan.
-- Target: top 10 (dari 10 tempat berhadiah $5). Lantai: rank 25.
-- Estimasi: **rank sekitar 10–25, peluang top 50 sekitar 40–50%**.
-  Alasan: entry ini lengkap (8 halaman fungsional, 38 provinsi, CSV,
-  grafik interaktif, sumber di tiap angka, screenshot asli desktop+HP,
-  main.ts teruji byte-identik) — di atas rata-rata entry "satu halaman
-  statis". Tapi hadiahnya kecil ($5/tempat) dan blind rounds berarti
-  field-nya belum terlihat; situs statistik yang kuat dari kompetitor
-  (mis. negara lain dengan data lebih dalam / visualisasi lebih kaya)
-  bisa menggeser. Kelemahan yang diakui: tidak ada peta interaktif
-  provinsi dan tidak ada perbandingan antar-negara — dua peningkatan
-  paling berdampak bila checkpoint ⅓ menunjukkan rank di luar top 25.
-- Tidak ada Goldfish review / top10-analysis di ronde ini (strategi
-  submit-cepat, build langsung tanpa analisis top-10 dulu — sesuai brief;
-  checkpoint ⅓ jendela: 27 Nov 12:39 WIB).
+Six files were already written earlier in the round and were not touched again:
+`app/data.js`, `app/charts.js`, `app/index.html`, `app/main.js`, `app/style.css`,
+`app/compare.js` (the last one rewritten in the same pass as views).
 
-## Revisi ronde 1 — 26 Nov ~15:20–16:30 WIB (koordinator fbb70594, builder 17e21d6e)
+## Cover, top to bottom
 
-Keputusan user 14:58: PILIH B — revisi dulu berbasis referensi (reference-analysis.md:
-BPS, World Bank Data, PlainCountries, Our World in Data dibaca langsung).
-Target: selesai cepat → submit RONDE 1 (cutoff 27 Nov 06:39 WIB).
+Short masthead with the wordmark, the tagline "Portal data Indonesia" and the
+nav. One headline line, no editorial paragraph. A stamp reading "Diperbarui
+27 November 2026. Data terbaru: 2025". Then the control row: the year slider
+with seven quick pills under it, and the indicator search box beside it. Then
+eight KPI cards in two rows of four, each with an optional 92 by 26 sparkline,
+the value, the label with its month tag where the measure is monthly, the
+context line, the Dunia line with the delta chip, the source and year, and a
+link to its section. Then the summary strip. The map sits to the right of the
+cards on a wide screen and drops below them on a phone.
 
-- Item 1 PERBANDINGAN: nilai "Dunia" di 5 kartu KPI (penduduk 8.141 jt, PDB
-  tumbuh 2,9%, inflasi 3,0% rata-rata tahunan, pengangguran 4,8% ILO,
-  kemiskinan 10,1% garis $2,15/hari) + strip "Bandingkan dengan negara
-  sebanding" (5 indikator × IDN/MYS/THA/VNM/PHL/Dunia). Semua 2024, World
-  Bank WDI via API publik (tanpa key), terverifikasi. Vintage ditangani
-  eksplisit di footnote (WB 283,5 jt vs BPS 281,6 jt beda metode; inflasi WB
-  rata-rata tahunan vs BPS Des y-on-y 1,57% beda ukuran). File baru
-  app/compare.js (84 baris).
-- Item 2 PETA PROVINSI: choropleth SVG 38 provinsi digambar tangan
-  (app/map.js, 108 baris, tanpa library/file peta luar), 5 tingkat warna
-  menurut penduduk 2024, label pulau + singkatan, klik = detail.
-- Item 3 INTERPRETASI: paragraf "Apa kata data" di beranda + catatan "Cara
-  membaca" di bawah grafik utama beranda/ekonomi/penduduk/harga/kerja.
-- Item 4 FAQ: 3 Q&A di halaman Tentang + Bank Dunia masuk daftar sumber.
-- Item 5 (kalender rilis, SDG) TIDAK dikerjakan.
-- main.ts + vendor/makefun-frontend.ts TIDAK disentuh. Validasi builder:
-  serve 200, 9 route headless OK (38 prov-link + 43 polygon di DOM),
-  offline bersih, HP tanpa overflow, main.ts 2x byte-identik (dossier
-  486.870 byte), 4 screenshot re-capture + diperiksa visual.
-- Commit baru: eceede5f46291a34a34e8317d29270827190329e (di atas 77bbcfe),
-  9 file (5 teks + 4 JPEG), head GitHub terverifikasi via API.
-- Bundle revisi: transcripts/best-national-statistics-site-20261126-0539-rev.tar.gz
-  (42.191.724 B, sha256 6d359fc9f50d5c0f75113b54e12bcd41b77a60cd1fe9b062bc747b1e98d51431;
-  2 sesi builder + 1 sesi koordinator + parent chat home chat sebagai context).
-  Pelajaran bundle: prompt-file HARUS kata-kata user verbatim (brief agen
-  DITOLAK run-record-not-whole) — dipakai pesan user "Coba referensi
-  beberapa web..." + --prompt-origin handed-off --prompt-via "makefun home
-  chat" + --parent-session sesi home chat. Usage rows gabungan:
-  usage-best-national-statistics-site-20261126-0539-rev.jsonl (2 baris:
-  builder v1 3.297.058/31.422 + builder revisi 7.680.415/42.519;
-  model ipnext/avocado-5.17-v2).
-- CHECK LOKAL (kit fresh level 53, 26 Nov ~16:20 WIB): **14 passed, 0 failed,
-  6 skipped, 5 at submission — ok TRUE. Reproduces 97,6%** (1029/1054
-  authored, 0 copied/pasted, 6 read, 19 absent), priced PASS (2 usage
-  records), in_window PASS (285 timestamp), run record PASS (handed-off),
-  own_work PASS. Catatan check: di atas keseluruhan deliverable share
-  authored 40,9% (1036/2528; 1372 absent — penyebut keduanya, skor tetap
-  97,6% yang dipakai site).
-- CEK TELITI segar (~16:20 WIB): kuota entries_made 0, day 6 left, hard 40
-  left, can_submit TRUE, fee free; kompetisi open + acceptingSubmissions
-  TRUE, submissionCount 2350, deadline 29 Nov 05:39 UTC; blind_round_slot
-  available, interval berakhir 27 Nov 06:39 WIB (= cutoff ronde 1).
-- Estimasi builder revisi: tidak ada estimasi rank baru yang ditulis;
-  estimasi v1 (rank ~10–25, P(top 50) 40–50%) masih berlaku sebagai lantai,
-  revisi menutup 2 kelemahan yang diakui v1 (perbandingan + peta).
-- Catatan kecil (bukan blocker): di screenshot 2-ekonomi, label tahun sumbu-x
-  grafik terpotong sebagian di tepi bawah viewport (halaman bisa di-scroll;
-  framing screenshot yang sama seperti v1).
-- Status: BUILT-AWAITING-APPROVAL (revisi). Ronde 1 MASIH TERKEJAR
-  (~14 jam ke cutoff saat laporan). TIDAK ADA submit dari koordinator.
+Under the dashboard: two charts side by side, GDP growth as signed columns and
+population as a line, both on the full 2019 to 2025 series, each with one
+sentence of interpretation underneath. Then an honest note saying the slider
+re-bases the cards and the strip but the charts keep the whole series on
+purpose, with the focused year highlighted inside them. Then the section
+explorer: nine cards, each carrying a key figure and one line. Then the peer
+strip: Indonesia against Malaysia, Thailand, Vietnam, the Philippines and the
+world on GDP per capita. Then the source footnote.
 
-## Revisi ronde 2 — 27 Nov ~14:40–16:30 WIB (builder subagent Muse, sesi b4901b44; koordinator 0d987391)
+The search box keeps the behaviour of the previous design: type a keyword, the
+list filters against 24 index entries, Enter goes to the first match's section.
 
-Hasil ronde 1 (live): rank 246/4140, skor 641755 (win rate 64,18%).
-Cutoff ronde 2: 28 Nov 2026 00:39 WIB. Satu pembeda: "Banding Dunia di
-tiap angka" (KPI Indonesia + Dunia berdampingan + chip delta, grafik
-dengan Dunia/negara sebanding, halaman #/banding khusus).
+## Pages
 
-### Yang diubah
+Thirteen routes and a 404. Each page carries headline figures with source and
+year, at least one chart or table, one sentence of interpretation under every
+chart, and a source footnote.
 
-- Data 2025 (semua terverifikasi sumber resmi, 27 Nov 2026): BPS —
-  PDB Rp23.821 T +5,11%, PDB/kapita Rp83,7 jt (US$5.083), inflasi Des
-  2,92%, TPT Feb 4,76%, kemiskinan Mar 8,47%, IPM 75,90, dagang
-  (ekspor US$282,91 M, impor US$241,86 M, surplus US$41,05 M),
-  penduduk 284,44 jt; WDI API — penduduk IDN 285.721.236, Dunia
-  8.215.424.893, tumbuh IDN 5,108% / Dunia 2,92%, PDB/kapita IDN
-  US$5.059,6 / Dunia US$14.405,8; Kemenkes — stunting 19,8% (2024).
-  TIDAK terverifikasi → TIDAK dipakai: melek huruf, TPT Agu 2025
-  (seri memakai `null` jujur untuk 2025), kelompok inflasi Des 2025
-  (halaman Harga tetap Des 2024 lengkap + catatan).
-- 3 seksi baru: Pendidikan, Kesehatan, Perdagangan (masing-masing
-  3–4 KPI + 1 grafik + 1 kalimat interpretasi). Nav 12 tautan.
-- Beranda: hero dipangkas (lede + eyebrow dihapus), tools panel
-  (pemilih tahun 2025/2024 + cari indikator + strip "Pada 2025: ..."),
-  8 kartu KPI compact (konteks + baris Dunia + chip delta + tautan
-  seksi), 2 grafik di viewport pertama 1280×800 (kpiTop 359,
-  kpiBottom 690, chartTop 700 — batang PDB + label nilai terlihat,
-  garis penduduk bagian atas terlihat). Grafik batang beranda memakai
-  sumbu max 6 (zoom); halaman Ekonomi tetap sumbu 10 penuh.
-- Halaman #/banding: toggle 5 metrik, grafik batang (log untuk
-  PDB/kapita + catatan skala jujur), tabel 6 negara + Dunia (2024),
-  interpretasi per metrik. Peta provinsi: toggle penduduk/kepadatan.
-- Pemilih tahun hanya me-rebase KPI + strip (grafik tetap seri penuh
-  2019–2025) — dicatat jujur di revision-log + halaman Tentang.
-- File: app/data.js (302 baris), views.js (568), charts.js (166,
-  opsi `max`/`log`, toleran `null`), compare.js (155), map.js (134),
-  main.js (212), style.css (344), index.html (26). main.ts / vendor /
-  README / LICENSE TIDAK disentuh.
+    #/            dashboard
+    #/ekonomi     growth, nominal GDP, per capita, world share, sectors, poverty, gini
+    #/penduduk    population series, world share, age structure, top provinces
+    #/provinsi    map with metric toggle, 38 province links, detail panel, full table
+    #/harga       inflation series, eleven CPI groups 2024, three verified groups 2025
+    #/kerja       unemployment series, Indonesia against the world, method notes
+    #/pendidikan  HDI 2022 to 2025, schooling, participation
+    #/kesehatan   life expectancy on two methods, stunting, health spending
+    #/perdagangan exports, imports, balance, destinations, oil and non-oil
+    #/banding     five measures, seven rows, log scale for GDP per capita
+    #/data        six releases, six indicator series, five sources
+    #/tentang     what the site does, what its limits are
+    404           anything else
 
-### Validasi yang dijalankan (ronde 2)
+## The province page
 
-1. **Serve lokal** (port 8123): 8 file HTTP 200.
-2. **Render 13 route** headless Chromium (CDP): semua OK, ready=true,
-   tanpa error JS/console. Satu "FAIL" harness `#/data` = bug marker
-   tes (`Data &amp; Unduhan` vs innerText `Data & Unduhan`), bukan bug
-   situs.
-3. **node --check** 6 file JS bersih (2x).
-4. **Offline**: tanpa fetch/XHR; `https://` hanya URL sumber
-   teks/tautan (bps.go.id, data.worldbank.org, kemkes.go.id, bi.go.id,
-   kemenkeu.go.id) + namespace SVG w3.org.
-5. **HP 390×844**: tanpa overflow horizontal (CDP scrollWidth +
-   baca visual).
-6. **main.ts 2x run** (TMPDIR workspace): `diff -r` identik —
-   **byte-identik**. `dossier.json` 602.551 byte (cover/images/schema/
-   text) — naik dari 486.870 (ronde 1).
-7. **Screenshot**: 4 JPEG q80, <256 KiB (1-home 143.900,
-   2-ekonomi 79.961, 3-provinsi 79.888, 4-home-phone 68.086 byte).
-   Diperiksa visual: 1-home (KPI 2025 + strip + judul + puncak 2
-   grafik di viewport pertama, tanpa tumpang-tindih), 2-ekonomi
-   (grafik PDB + interpretasi bersih), 3-provinsi (peta mode
-   penduduk bersih), 4-home-phone (nav membungkus rapi, tanpa
-   overflow).
-8. **Interaksi live**: pemilih tahun 2024 → KPI 281,6 jt + strip
-   2024 OK; cari "inflasi" → 2 hasil, Enter → #/harga OK; toggle
-   banding → Penduduk OK; toggle peta → kepadatan OK; tanpa error JS.
+The map is passed in as a black box: `provinceMapSVG(name, metric)` returns the
+markup and `mapLegend(metric)` returns its legend. The page never reimplements
+the geometry, so the map and the table cannot drift apart. The metric toggle
+switches between population and density, and the legend, the shading, the
+number beside each province link and the sort order of the table all follow it.
+Clicking a province sets `?pilih=` and the detail panel fills in.
 
-### Estimasi rank / peluang (jujur, diperbarui)
+Population and area are the stored numbers; density and share are computed from
+them, never stored, so a table row and a map shade cannot disagree.
 
-- Estimasi: **rank ~50–100, P(top 50) ~30–40%** — MASIH di bawah
-  lantai rank 25. Ronde ini menutup 6 dari 7 gap terkonfirmasi
-  (tahun acuan, cakupan 4 → 11 halaman, cari + pemilih tahun,
-  konteks + chip delta, stempel kesegaran, peta bertoggle + Banding).
-  Yang masih kurang vs top 10: peta masih skematis (bukan geojson
-  asli), data provinsi masih 2024, belum ada unduhan data 2025 per
-  provinsi. Loop-breaker: estimasi tetap ≥50 → kembali ke user
-  dengan opsi (ronde tambahan / berhenti), jangan rebuild ronde ke-3
-  tanpa keputusan baru.
-- TIDAK ADA submit / bundle / check di sesi ini — hanya build +
-  push, sesuai brief.
+## Data honesty
 
-## Catatan
+The brief's rules were followed literally:
 
-- TIDAK submit / bundle / check di sesi ini — hanya build, sesuai brief.
-  Watch yang melanjutkan repo + bundle + check.
-- Skill pusat dicek dulu: skill `makefun` (v1.5.234) + `frontend-design`
-  tersedia dan dipakai sebagai panduan; tidak ada skill/tool baru yang
-  di-install atau dibutuhkan.
+- Unemployment and poverty carry `null` for 2025, because both are measured in
+  August and September and those releases are not verified. The chart draws a
+  gap; the card shows the latest verified month instead, with the month named
+  on the chip: 4,76 percent for February 2025 and 8,47 percent for March 2025.
+- World poverty is 2024 and its label says 2024. World life expectancy 2025 is
+  not published, so that line says so rather than carrying 2024 silently.
+- The price page stays on December 2024 for the eleven group chart, because
+  only three December 2025 groups are verified. Those three appear in their own
+  chart with their own label, so two vintages never share an axis.
+- Two numbers for the same thing are both shown with the method difference
+  explained: population (BPS projection versus UN estimate), inflation
+  (December to December versus annual average), unemployment (Sakernas versus
+  ILO model), poverty (national line versus USD 2.15), life expectancy
+  (indirect method versus UN estimate).
+
+## Numbers for this round
+
+    app/index.html      2562 bytes
+    app/style.css      29330 bytes
+    app/main.js         5116 bytes
+    app/data.js        34514 bytes
+    app/views.js       62350 bytes
+    app/charts.js      18369 bytes
+    app/map.js          8024 bytes  (untouched, as delivered)
+    app/compare.js      5182 bytes
+    whole app         165447 bytes in 8 files
+
+    first load          8 files, 165447 raw, 44688 gzip-9 bytes
+    loaded later        0 files
+    dossier             665635 bytes, text capped at 163840
+
+`node --check` passes on all six JavaScript modules. `node main.ts` run twice
+into two directories produces byte-identical trees, dossier included.
+
+## Estimate for this round
+
+The analysis put the top 50 band around 660 to 700k and the ceiling of a
+revision round at roughly one to two percent on top of a 641.755 base. This
+round changes one thing only, and it changes it where the judge looks first:
+the cover now holds eight live figures, a seven year control and a 38 province
+map in the first viewport, against the previous editorial hero.
+
+Own estimate: 655 to 675k, which is the rank 50 to 80 band, not a safe top 50.
+The honest reason for the ceiling: the judge compares screenshots, and a
+dashboard that needs a drag to prove itself still has to look convincing in one
+still frame. The card density and the map carry that load.
+
+If that estimate holds after this round, the loop-breaker set out in the
+analysis applies: stop here and report rather than spend another round.
+
+## Limits
+
+- Screenshots are not shot or edited in this round; the coordinator re-shoots
+  them on the VM. The four files in `screenshots/` are still the round 2 shots.
+- `main.ts` was run without `MAKEFUN_ENV_URL`, so the build path is proven and
+  the serve and register path is written but not exercised against a live
+  suite. `node --check` does not apply to TypeScript; the file was run instead,
+  which is the stronger check.
+- No provincial time series, no provincial poverty, no spreadsheet download.
+  Those need releases that are not verified, and guessing them would break the
+  one rule that matters for this entry.

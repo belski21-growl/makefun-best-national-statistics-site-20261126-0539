@@ -1,212 +1,136 @@
-// SPDX-License-Identifier: MIT
-// NusaStat — router hash + pengikat kontrol halaman.
+// NusaStat entry module: hash router, shared state, and the two gestures the
+// site is built around. Every figure lives in data.js; this file only decides
+// which year and which province are focused and which view renders.
 //
-//   #/                     Beranda (tahun fokus + cari indikator)
-//   #/ekonomi              Ekonomi (pilih seri + jenis grafik + CSV)
-//   #/penduduk             Penduduk
-//   #/provinsi             Provinsi (cari + urutkan + detail + CSV + toggle metrik peta)
-//   #/harga                Harga
-//   #/kerja                Ketenagakerjaan
-//   #/pendidikan           Pendidikan (baru, revisi ronde 2)
-//   #/kesehatan            Kesehatan (baru, revisi ronde 2)
-//   #/perdagangan          Perdagangan (baru, revisi ronde 2)
-//   #/banding              Banding ASEAN + dunia (baru, revisi ronde 2)
-//   #/data                 Data & unduhan (CSV)
-//   #/tentang              Tentang
-//
-// window.__shotReady bernilai false saat halaman dirender dan true setelah
-// tampil, supaya skrip screenshot tahu kapan menangkap layar.
+// State lives in the URL so a reload, a back button and a copied link all show
+// the same dashboard: #/ , #/provinsi?pilih=Aceh , #/ekonomi?tahun=2020 .
 
-import { YEARS, SERIES, PROVINCES, PRICE_GROUPS, density } from './data.js';
-import {
-  home, economy, people, provinces, prices, labour, education, health,
-  trade, comparePage, dataPage, about, missing,
-} from './views.js';
+import { LATEST_YEAR, YEARS } from './data.js';
+import { renderHome, renderNotFound } from './views.js';
+import { renderEconomy, renderPopulation, renderPrice, renderLabour, renderEducation, renderHealth, renderTrade, renderData, renderAbout } from './views.js';
+import { renderProvincePage } from './views.js';
+import { renderCompare } from './compare.js';
+import { bindChrome, setActiveNav } from './views.js';
 
-const app = document.getElementById('app');
-
-function parseHash() {
-  const raw = location.hash || '#/';
-  const [pathPart, queryPart] = raw.slice(2).split('?');
-  const path = `/${pathPart || ''}`;
-  const query = new URLSearchParams(queryPart || '');
-  return { path, query };
-}
-
-function downloadCsv(filename, header, rows) {
-  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const text = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
-  const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-
-function bindPage(path, state) {
-  if (path === '/') {
-    const yearSel = document.getElementById('year-focus');
-    if (yearSel) {
-      yearSel.addEventListener('change', () => {
-        state.tahun = yearSel.value;
-        render();
-      });
-    }
-    // Cari indikator: filter daftar di tempat (tanpa render ulang supaya
-    // fokus dan isi kotak tidak hilang tiap ketikan).
-    const search = document.getElementById('indicator-search');
-    const results = document.getElementById('search-results');
-    if (search && results) {
-      search.addEventListener('input', () => {
-        const q = search.value.trim().toLowerCase();
-        let shown = 0;
-        for (const li of results.children) {
-          const hit = !q || (li.getAttribute('data-q') || '').includes(q);
-          li.style.display = hit ? '' : 'none';
-          if (hit) shown += 1;
-        }
-        results.hidden = !q || shown === 0;
-      });
-      // Enter = lompat ke hasil pertama yang terlihat.
-      search.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter') return;
-        const first = [...results.children].find((li) => li.style.display !== 'none');
-        const link = first && first.querySelector('a');
-        if (link) location.hash = link.getAttribute('href');
-      });
-    }
-  }
-  if (path === '/ekonomi') {
-    const seriesSel = document.getElementById('econ-series');
-    const chartSel = document.getElementById('econ-chart');
-    const rerender = () => {
-      state.series = seriesSel.value;
-      state.chart = chartSel.value;
-      render();
-    };
-    if (seriesSel) seriesSel.addEventListener('change', rerender);
-    if (chartSel) chartSel.addEventListener('change', rerender);
-    const btn = document.getElementById('econ-csv');
-    if (btn) {
-      btn.addEventListener('click', () => {
-        const s = SERIES[state.series || 'gdpGrowth'];
-        downloadCsv(`nusastat-${state.series || 'gdpGrowth'}.csv`, ['tahun', s.label], YEARS.map((y, i) => [y, s.values[i] ?? '']));
-      });
-    }
-  }
-  if (path === '/provinsi') {
-    const metricSel = document.getElementById('map-metric');
-    if (metricSel) {
-      metricSel.addEventListener('change', () => {
-        state.mapMetric = metricSel.value;
-        render();
-      });
-    }
-    const search = document.getElementById('prov-search');
-    const sort = document.getElementById('prov-sort');
-    if (search) {
-      search.addEventListener('input', () => {
-        state.cari = search.value;
-        render();
-        const again = document.getElementById('prov-search');
-        if (again) {
-          again.focus();
-          again.setSelectionRange(again.value.length, again.value.length);
-        }
-      });
-    }
-    if (sort) sort.addEventListener('change', () => { state.urut = sort.value; render(); });
-    const btn = document.getElementById('prov-csv');
-    if (btn) {
-      btn.addEventListener('click', () => {
-        downloadCsv('nusastat-provinsi.csv', ['provinsi', 'penduduk_juta_2024', 'luas_km2', 'kepadatan_per_km2'],
-          PROVINCES.map((p) => [p.name, p.pop, p.area * 1000, density(p)]));
-      });
-    }
-  }
-  if (path === '/banding') {
-    const metricSel = document.getElementById('compare-metric');
-    if (metricSel) {
-      metricSel.addEventListener('change', () => {
-        state.compareMetric = metricSel.value;
-        render();
-      });
-    }
-  }
-  if (path === '/data') {
-    const dlSeries = document.getElementById('dl-series');
-    if (dlSeries) {
-      dlSeries.addEventListener('click', () => {
-        const header = ['tahun', ...Object.values(SERIES).map((s) => s.label)];
-        const rows = YEARS.map((y, i) => [y, ...Object.values(SERIES).map((s) => (s.values[i] ?? ''))]);
-        downloadCsv('nusastat-seri-tahunan.csv', header, rows);
-      });
-    }
-    const dlProv = document.getElementById('dl-prov');
-    if (dlProv) {
-      dlProv.addEventListener('click', () => {
-        downloadCsv('nusastat-provinsi.csv', ['provinsi', 'penduduk_juta_2024', 'luas_km2', 'kepadatan_per_km2'],
-          PROVINCES.map((p) => [p.name, p.pop, p.area * 1000, density(p)]));
-      });
-    }
-    const dlPrices = document.getElementById('dl-prices');
-    if (dlPrices) {
-      dlPrices.addEventListener('click', () => {
-        downloadCsv('nusastat-inflasi-kelompok.csv', ['kelompok', 'inflasi_persen_des2024'],
-          PRICE_GROUPS.map((g) => [g.name, g.value]));
-      });
-    }
-  }
-}
-
-const TITLES = {
-  '/': 'NusaStat — Angka Indonesia, Dijelaskan dengan Jujur',
-  '/ekonomi': 'Ekonomi | NusaStat',
-  '/penduduk': 'Penduduk | NusaStat',
-  '/provinsi': 'Provinsi | NusaStat',
-  '/harga': 'Harga | NusaStat',
-  '/kerja': 'Ketenagakerjaan | NusaStat',
-  '/pendidikan': 'Pendidikan | NusaStat',
-  '/kesehatan': 'Kesehatan | NusaStat',
-  '/perdagangan': 'Perdagangan | NusaStat',
-  '/banding': 'Banding: Indonesia vs ASEAN & Dunia | NusaStat',
-  '/data': 'Data & Unduhan | NusaStat',
-  '/tentang': 'Tentang | NusaStat',
+// Routes are matched on the hash path only; the query holds the focus state.
+const ROUTES = {
+  '/': { view: renderHome, nav: '/' },
+  '/ekonomi': { view: renderEconomy, nav: '/ekonomi' },
+  '/penduduk': { view: renderPopulation, nav: '/penduduk' },
+  '/provinsi': { view: renderProvincePage, nav: '/provinsi' },
+  '/harga': { view: renderPrice, nav: '/harga' },
+  '/kerja': { view: renderLabour, nav: '/kerja' },
+  '/pendidikan': { view: renderEducation, nav: '/pendidikan' },
+  '/kesehatan': { view: renderHealth, nav: '/kesehatan' },
+  '/perdagangan': { view: renderTrade, nav: '/perdagangan' },
+  '/banding': { view: renderCompare, nav: '/banding' },
+  '/data': { view: renderData, nav: '/data' },
+  '/tentang': { view: renderAbout, nav: '/tentang' },
 };
 
-const state = {
-  series: 'gdpGrowth', chart: 'bar', cari: '', urut: 'pop', pilih: null,
-  tahun: '2025', compareMetric: 'gdpCap', mapMetric: 'pop',
-};
+const main = document.getElementById('main');
 
-function render() {
-  window.__shotReady = false;
-  const { path, query } = parseHash();
-  state.cari = query.get('cari') ?? state.cari;
-  state.pilih = query.get('pilih') ?? null;
-  let html;
-  if (path === '/') html = home(state);
-  else if (path === '/ekonomi') html = economy(state);
-  else if (path === '/penduduk') html = people(state);
-  else if (path === '/provinsi') html = provinces(state);
-  else if (path === '/harga') html = prices(state);
-  else if (path === '/kerja') html = labour();
-  else if (path === '/pendidikan') html = education();
-  else if (path === '/kesehatan') html = health();
-  else if (path === '/perdagangan') html = trade();
-  else if (path === '/banding') html = comparePage(state);
-  else if (path === '/data') html = dataPage();
-  else if (path === '/tentang') html = about();
-  else html = missing();
-  document.title = TITLES[path] || 'Halaman tidak ditemukan | NusaStat';
-  app.innerHTML = html;
-  bindPage(path, state);
-  window.scrollTo(0, 0);
-  window.__shotReady = true;
+// The focused year: inside 2019 to 2025, else the latest. Read from ?tahun=.
+export function currentState() {
+  const raw = location.hash.replace(/^#/, '') || '/';
+  const [pathPart, queryPart = ''] = raw.split('?');
+  const path = pathPart === '' ? '/' : pathPart;
+  const params = new URLSearchParams(queryPart);
+
+  const yearRaw = Number(params.get('tahun'));
+  const year = YEARS.includes(yearRaw) ? yearRaw : LATEST_YEAR;
+
+  const metricRaw = params.get('metrik');
+  const metric = metricRaw === 'density' ? 'density' : metricRaw === 'pop' ? 'pop' : 'pop';
+
+  const compareRaw = params.get('ukur');
+  const compareMetric = compareRaw || 'pcap';
+
+  return {
+    path,
+    year,
+    province: params.get('pilih') || null,
+    metric,
+    compareMetric,
+    params,
+  };
 }
 
-window.addEventListener('hashchange', render);
-render();
+// Build a hash for a route, keeping the focused year unless told otherwise.
+export function routeHash(path, options = {}) {
+  const state = currentState();
+  const year = options.year === undefined ? state.year : Number(options.year);
+  const params = new URLSearchParams();
+  if (options.keep !== false && YEARS.includes(year) && year !== LATEST_YEAR) params.set('tahun', String(year));
+  if (options.province) params.set('pilih', options.province);
+  if (options.metric && options.metric !== 'pop') params.set('metrik', options.metric);
+  if (options.compareMetric && options.compareMetric !== 'pcap') params.set('ukur', options.compareMetric);
+  const query = params.toString();
+  return '#' + path + (query ? '?' + query : '');
+}
+
+// Everything that must follow the focused year: the URL and the readout.
+export function go(hash) {
+  if (location.hash === hash) {
+    render();
+  } else {
+    location.hash = hash;
+  }
+}
+
+function scrollToTop() {
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const target = document.querySelector('.page-head') || main;
+  if (target && typeof target.scrollIntoView === 'function') {
+    target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+  }
+}
+
+let lastPath = null;
+
+function render(options = {}) {
+  const state = currentState();
+  const route = ROUTES[state.path];
+  if (!route) {
+    main.innerHTML = renderNotFound(state);
+    setActiveNav(null);
+    bindChrome(state);
+    document.title = titleFor(state.path);
+    if (options.scroll || (lastPath !== null && lastPath !== state.path)) scrollToTop();
+    lastPath = state.path;
+    return;
+  }
+
+  main.innerHTML = route.view(state);
+  setActiveNav(route.nav);
+  bindChrome(state);
+  document.title = titleFor(state.path);
+  // Scroll only when the route actually changed after a first paint: a first
+  // load must keep the masthead in view, and a year change must not jump.
+  if (options.scroll || (lastPath !== null && lastPath !== state.path)) scrollToTop();
+  lastPath = state.path;
+}
+
+function titleFor(path) {
+  const names = {
+    '/': 'NusaStat: portal data Indonesia 2019 sampai 2025',
+    '/ekonomi': 'Ekonomi Indonesia: NusaStat',
+    '/penduduk': 'Penduduk Indonesia: NusaStat',
+    '/provinsi': '38 provinsi Indonesia: NusaStat',
+    '/harga': 'Harga dan inflasi: NusaStat',
+    '/kerja': 'Ketenagakerjaan: NusaStat',
+    '/pendidikan': 'Pendidikan dan IPM: NusaStat',
+    '/kesehatan': 'Kesehatan: NusaStat',
+    '/perdagangan': 'Perdagangan luar negeri: NusaStat',
+    '/banding': 'Banding ASEAN dan dunia: NusaStat',
+    '/data': 'Data dan unduhan: NusaStat',
+    '/tentang': 'Tentang NusaStat dan metodenya',
+  };
+  return names[path] || 'NusaStat: halaman tidak ditemukan';
+}
+
+window.addEventListener('hashchange', () => render());
+window.addEventListener('DOMContentLoaded', () => {});
+
+// Render right away: the module is deferred, so the DOM is already parsed.
+render({ scroll: false });
